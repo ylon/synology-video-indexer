@@ -4,7 +4,7 @@
 # License: MIT
 # Author: ylon <openlemon@gmail.com>
 #
-# Reindex /volume1/video/ ignoring hidden files, only comparing paths.
+# Reindex /volume1/video/ only comparing paths and ignoring hidden files (rsync safe).
 #
 
 class SynologyVideoIndexer

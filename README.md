@@ -2,7 +2,7 @@
 
 Problem: Files copied to a Synology NAS via RSYNC or SSH are not automatically indexed and the command `synoindex -R video` reindex everything.
 
-This script reindex `/volume1/video/` adding or removing only what is needed, comparing the mediaserver database and file system contents based on paths, file size and mtime are not considered, hidden files are ignored (rsync safe)
+This script reindex `/volume1/video/` adding or removing only what is needed, comparing the mediaserver database and file system contents based on paths, file size and mtime are not considered, hidden files are ignored (rsync safe).
 
 ## Usage
 
