@@ -1,0 +1,91 @@
+#!/usr/bin/env php
+<?php
+#
+# License: MIT
+# Author: ylon <openlemon@gmail.com>
+#
+# Reindex /volume1/video/
+#
+
+class SynologyVideoIndexer
+{
+	public $opts = array
+	(
+		"dryRun" => false
+	);
+	private $listCmds = array
+	(
+		"db" => "{ psql -U postgres mediaserver -tAc 'select path from directory;' | grep '^/volume1/video/' | sed 's#$#/#'; psql -U postgres mediaserver -tAc 'select path from video;'; }",
+		"fs" => "{ find /volume1/video/ -mindepth 1 -type d \( ! -path '*/.*' \) | sed 's#$#/#' ; find /volume1/video/ -mindepth 1 \( -type f -o -type l \) \( ! -path '*/.*' \); }"
+	);
+
+	public function start ()
+	{
+		// list database
+		$dbFiles = array();
+		$rv = null;
+		exec($this->listCmds["db"], $dbFiles, $rv);
+		if ($rv!==0)
+			throw new Exception("fail list dbFiles");
+
+		// list filesystem
+		$fsFiles = array();
+		$rv = null;
+		exec($this->listCmds["fs"], $fsFiles, $rv);
+		if ($rv!==0)
+			throw new Exception("fail list fsFiles");
+
+		$this->index($dbFiles, $fsFiles);
+	}
+
+	// synoindex operations on a directory are recursive, so when a directory is indexed no need to index its subfiles.
+	//
+	public function index ($dbFiles, $fsFiles)
+	{
+		sort($dbFiles);
+		sort($fsFiles);
+
+		// to be deleted
+		$delDirs = $delFiles = array();
+		foreach ($dbFiles as $f)
+			if (!in_array($f, $fsFiles) && !$this->isSubfile($f, $delDirs))
+				if ($this->isDir($f)) $delDirs[]=$f; else $delFiles[]=$f;
+
+		// to be added
+		$addDirs = $addFiles = array();
+		foreach ($fsFiles as $f)
+			if (!in_array($f, $dbFiles) && !$this->isSubfile($f, $addDirs))
+				if ($this->isDir($f)) $addDirs[]=$f; else $addFiles[]=$f;
+
+		foreach ($delDirs as $f) $this->synoindex($f, "D");
+		foreach ($delFiles as $f) $this->synoindex($f, "d");
+		foreach ($addDirs as $f) $this->synoindex($f, "A");
+		foreach ($addFiles as $f) $this->synoindex($f, "a");
+
+		if ($this->opts["dryRun"]) echo "\nDRY RUN\n";
+	}
+
+	function synoindex ($file, $action)
+	{
+		$cmd = sprintf("synoindex -%s %s", $action, escapeshellarg(rtrim($file, "/")));
+		echo $cmd,"\n";
+		if (!$this->opts["dryRun"]) passthru($cmd);
+	}
+
+	function isSubfile ($file, $dirs)
+	{
+		foreach ($dirs as $dir)
+			if (strpos($file, $dir)===0)
+				return true;
+		return false;
+	}
+
+	function isDir ($file)
+	{
+		return substr($file, -1)==="/";
+	}
+}
+
+$i=new SynologyVideoIndexer();
+if (sizeof($argv)-1>0 && $argv[1]=="-n") $i->opts["dryRun"]=true;
+$i->start();
